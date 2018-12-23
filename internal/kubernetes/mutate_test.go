@@ -94,7 +94,7 @@ func TestPatch(t *testing.T) {
 				},
 				Strategy: MutationStrategy{Overwrite: true},
 			},
-			want: []byte("[{\"op\":\"replace\",\"path\":\"/spec/dnsPolicy\",\"value\":\"None\"},{\"op\":\"add\",\"path\":\"/spec/dnsConfig\",\"value\":{\"nameservers\":[\"127.0.0.1\"]}}]"),
+			want: []byte("[{\"op\":\"add\",\"path\":\"/spec/dnsConfig\",\"value\":{\"nameservers\":[\"127.0.0.1\"]}},{\"op\":\"replace\",\"path\":\"/spec/dnsPolicy\",\"value\":\"None\"}]"),
 		},
 	}
 

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"sort"
 
 	"github.com/appscode/jsonpatch"
 	"github.com/imdario/mergo"
@@ -110,11 +111,11 @@ func (m PodMutation) Patch(original core.Pod) ([]byte, error) {
 	if err := serializer.Encode(&injected, pb); err != nil {
 		return nil, errors.Wrap(err, "cannot encode patched pod as JSON")
 	}
-	// TODO(negz): Sort patch before marshalling it.
 	patch, err := jsonpatch.CreatePatch(ob.Bytes(), pb.Bytes())
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create patch")
 	}
+	sort.Sort(jsonpatch.ByPath(patch))
 	b, err := json.Marshal(patch)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot encode patch as JSON")
