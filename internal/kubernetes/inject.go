@@ -103,11 +103,6 @@ func (s PodInjection) Patch(original core.Pod) ([]byte, error) {
 	return b, nil
 }
 
-// A Reviewer reviews admission requests.
-type Reviewer interface {
-	Review(*admission.AdmissionReview) *admission.AdmissionResponse
-}
-
 // PodInjector is a Reviewer that approves and patches pod admission requests.
 type PodInjector struct {
 	l      *zap.Logger
@@ -195,6 +190,7 @@ func (i *PodInjector) Review(ar *admission.AdmissionRequest) *admission.Admissio
 	}
 
 	return &admission.AdmissionResponse{
+		UID:       ar.UID,
 		Allowed:   true,
 		Patch:     patch,
 		PatchType: &jsonPatch,
