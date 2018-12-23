@@ -53,19 +53,19 @@ func TestPatch(t *testing.T) {
 	cases := []struct {
 		name string
 		pod  core.Pod
-		spec PodInjection
+		spec PodMutation
 		want []byte
 	}{
 		{
 			name: "NoOp",
 			pod:  coolPod,
-			spec: PodInjection{},
+			spec: PodMutation{},
 			want: []byte("[]"),
 		},
 		{
 			name: "AddAnnotation",
 			pod:  coolPod,
-			spec: PodInjection{
+			spec: PodMutation{
 				ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"supercool": "alsotrue"}},
 			},
 			want: []byte("[{\"op\":\"add\",\"path\":\"/metadata/annotations/supercool\",\"value\":\"alsotrue\"}]"),
@@ -73,26 +73,26 @@ func TestPatch(t *testing.T) {
 		{
 			name: "AddContainer",
 			pod:  coolPod,
-			spec: PodInjection{
+			spec: PodMutation{
 				Spec: core.PodSpec{
 					Containers: []core.Container{{
 						Name:  "coolercontainer",
 						Image: "extracool:somehowmorecool",
 					}},
 				},
-				Strategy: InjectionStrategy{Append: true},
+				Strategy: MutationStrategy{Append: true},
 			},
 			want: []byte("[{\"op\":\"add\",\"path\":\"/spec/containers/1\",\"value\":{\"image\":\"extracool:somehowmorecool\",\"name\":\"coolercontainer\",\"resources\":{}}}]"),
 		},
 		{
 			name: "OverrideNameservers",
 			pod:  coolPod,
-			spec: PodInjection{
+			spec: PodMutation{
 				Spec: core.PodSpec{
 					DNSPolicy: core.DNSNone,
 					DNSConfig: &core.PodDNSConfig{Nameservers: []string{"127.0.0.1"}},
 				},
-				Strategy: InjectionStrategy{Overwrite: true},
+				Strategy: MutationStrategy{Overwrite: true},
 			},
 			want: []byte("[{\"op\":\"replace\",\"path\":\"/spec/dnsPolicy\",\"value\":\"None\"},{\"op\":\"add\",\"path\":\"/spec/dnsConfig\",\"value\":{\"nameservers\":[\"127.0.0.1\"]}}]"),
 		},
@@ -121,7 +121,7 @@ func TestReview(t *testing.T) {
 	cases := []struct {
 		name    string
 		patcher Patcher
-		options []PodInjectorOption
+		options []PodMutatorOption
 		ar      *admission.AdmissionRequest
 		want    *admission.AdmissionResponse
 	}{
@@ -133,7 +133,7 @@ func TestReview(t *testing.T) {
 				Result: &meta.Status{
 					Status:  meta.StatusFailure,
 					Reason:  meta.StatusReasonInvalid,
-					Message: "not reviewing unexpected non-pod resource",
+					Message: "cannot review non-pod resource",
 				},
 			},
 		},
@@ -155,7 +155,7 @@ func TestReview(t *testing.T) {
 		{
 			name:    "PodWithHostNetworkIsIgnored",
 			patcher: &predictablePatcher{patch: coolPatch},
-			options: []PodInjectorOption{WithIgnoreFuncs(IgnorePodsInHostNetwork())},
+			options: []PodMutatorOption{WithIgnoreFuncs(IgnorePodsInHostNetwork())},
 			ar: &admission.AdmissionRequest{
 				Resource: resourcePod,
 				Object: runtime.RawExtension{Raw: func() []byte {
@@ -170,7 +170,7 @@ func TestReview(t *testing.T) {
 		{
 			name:    "PodWithAnnotationIsIgnored",
 			patcher: &predictablePatcher{patch: coolPatch},
-			options: []PodInjectorOption{WithIgnoreFuncs(IgnorePodsWithAnnotation("cool", "nope"))},
+			options: []PodMutatorOption{WithIgnoreFuncs(IgnorePodsWithAnnotation("cool", "nope"))},
 			ar: &admission.AdmissionRequest{
 				Resource: resourcePod,
 				Object: runtime.RawExtension{Raw: func() []byte {
@@ -223,7 +223,7 @@ func TestReview(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			i := NewPodInjector(tc.patcher, tc.options...)
+			i := NewPodMutator(tc.patcher, tc.options...)
 			if diff := deep.Equal(i.Review(tc.ar), tc.want); diff != nil {
 				t.Errorf("got != want:\n%v\n", diff)
 			}

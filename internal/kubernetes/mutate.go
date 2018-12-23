@@ -18,12 +18,14 @@ package kubernetes
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 
-	"github.com/imdario/mergo"
-
 	"github.com/appscode/jsonpatch"
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 	"go.uber.org/zap"
 	admission "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
@@ -34,8 +36,8 @@ import (
 
 // Annotation values controlling injection.
 const (
-	InjectionStatusDone = "injected"
-	InjectionDisabled   = "disable"
+	MutationDone     = "mutated"
+	MutationDisabled = "disabled"
 )
 
 var (
@@ -44,20 +46,36 @@ var (
 	serializer  = runtimejson.NewSerializer(runtimejson.DefaultMetaFactory, scheme.Scheme, scheme.Scheme, false)
 )
 
+const (
+	tagResultMutated = "mutated"
+	tagResultIgnored = "ignored"
+	tagResultError   = "error"
+)
+
+// Opencensus measurements.
+var (
+	MeasurePodsReviewed = stats.Int64("patch/pods_reviewed", "Number of pods reviewed.", stats.UnitDimensionless)
+
+	TagKind, _      = tag.NewKey("kind")
+	TagNamespace, _ = tag.NewKey("namespace")
+	TagName, _      = tag.NewKey("name")
+	TagResult, _    = tag.NewKey("result")
+)
+
 // A Patcher generates an RFC6902 JSON patch for the supplied pod.
 type Patcher interface {
 	Patch(core.Pod) ([]byte, error)
 }
 
-// PodInjection specifies what will by injected into a pod.
-type PodInjection struct {
+// PodMutation specifies how a pod will be mutated.
+type PodMutation struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            core.PodSpec      `json:"spec,omitempty"`
-	Strategy        InjectionStrategy `json:"strategy,omitempty"`
+	Spec            core.PodSpec     `json:"spec,omitempty"`
+	Strategy        MutationStrategy `json:"strategy,omitempty"`
 }
 
-// InjectionStrategy determines how pod configuration will be injected.
-type InjectionStrategy struct {
+// MutationStrategy determines how pod configuration will be injected.
+type MutationStrategy struct {
 	// Overwrite keys that are already set in the original pod.
 	Overwrite bool `json:"overwrite,omitempty"`
 
@@ -66,21 +84,21 @@ type InjectionStrategy struct {
 }
 
 // Patch generates an RFC 6902 JSON patch for the supplied pod.
-func (s PodInjection) Patch(original core.Pod) ([]byte, error) {
+func (m PodMutation) Patch(original core.Pod) ([]byte, error) {
 	var injected core.Pod
 	original.DeepCopyInto(&injected)
 
 	mo := []func(*mergo.Config){}
-	if s.Strategy.Overwrite {
+	if m.Strategy.Overwrite {
 		mo = append(mo, mergo.WithOverride)
 	}
-	if s.Strategy.Append {
+	if m.Strategy.Append {
 		mo = append(mo, mergo.WithAppendSlice)
 	}
-	if err := mergo.Merge(&injected.ObjectMeta, s.ObjectMeta, mo...); err != nil {
+	if err := mergo.Merge(&injected.ObjectMeta, m.ObjectMeta, mo...); err != nil {
 		return nil, errors.Wrap(err, "cannot inject pod metadata")
 	}
-	if err := mergo.Merge(&injected.Spec, s.Spec, mo...); err != nil {
+	if err := mergo.Merge(&injected.Spec, m.Spec, mo...); err != nil {
 		return nil, errors.Wrap(err, "cannot inject pod spec")
 	}
 
@@ -92,6 +110,7 @@ func (s PodInjection) Patch(original core.Pod) ([]byte, error) {
 	if err := serializer.Encode(&injected, pb); err != nil {
 		return nil, errors.Wrap(err, "cannot encode patched pod as JSON")
 	}
+	// TODO(negz): Sort patch before marshalling it.
 	patch, err := jsonpatch.CreatePatch(ob.Bytes(), pb.Bytes())
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create patch")
@@ -103,8 +122,8 @@ func (s PodInjection) Patch(original core.Pod) ([]byte, error) {
 	return b, nil
 }
 
-// PodInjector is a Reviewer that approves and patches pod admission requests.
-type PodInjector struct {
+// PodMutator is a Reviewer that mutates pods.
+type PodMutator struct {
 	l      *zap.Logger
 	p      Patcher
 	ignore []IgnoreFunc
@@ -129,42 +148,49 @@ func IgnorePodsWithAnnotation(k, v string) IgnoreFunc {
 	}
 }
 
-// A PodInjectorOption configures an PodInjector.
-type PodInjectorOption func(d *PodInjector)
+// A PodMutatorOption configures an PodMutator.
+type PodMutatorOption func(d *PodMutator)
 
-// WithLogger configures a PodInjector to use the supplied logger.
-func WithLogger(l *zap.Logger) PodInjectorOption {
-	return func(i *PodInjector) {
-		i.l = l
+// WithLogger configures a PodMutator to use the supplied logger.
+func WithLogger(l *zap.Logger) PodMutatorOption {
+	return func(m *PodMutator) {
+		m.l = l
 	}
 }
 
-// WithIgnoreFuncs configs a PodInjector with the supplied ignore functions.
-func WithIgnoreFuncs(fn ...IgnoreFunc) PodInjectorOption {
-	return func(i *PodInjector) {
-		i.ignore = fn
+// WithIgnoreFuncs configs a PodMutator with the supplied ignore functions.
+func WithIgnoreFuncs(fn ...IgnoreFunc) PodMutatorOption {
+	return func(m *PodMutator) {
+		m.ignore = fn
 	}
 }
 
-// NewPodInjector returns a new NewPodInjector with the supplied options.
-func NewPodInjector(p Patcher, io ...PodInjectorOption) *PodInjector {
-	i := &PodInjector{l: zap.NewNop(), p: p}
-	for _, o := range io {
-		o(i)
+// NewPodMutator returns a new NewPodMutator with the supplied options.
+func NewPodMutator(p Patcher, mo ...PodMutatorOption) *PodMutator {
+	m := &PodMutator{l: zap.NewNop(), p: p}
+	for _, o := range mo {
+		o(m)
 	}
-	return i
+	return m
 }
 
 // Review approves and patches pod admission requests.
-func (i *PodInjector) Review(ar *admission.AdmissionRequest) *admission.AdmissionResponse {
-	log := i.l.With(
+func (m *PodMutator) Review(ar *admission.AdmissionRequest) *admission.AdmissionResponse {
+	log := m.l.With(
 		zap.String("kind", ar.Kind.String()),
 		zap.String("namespace", ar.Namespace),
 		zap.String("name", ar.Name))
 
+	tags, _ := tag.New(context.Background(), // nolint:gosec
+		tag.Upsert(TagKind, ar.Kind.String()),
+		tag.Upsert(TagNamespace, ar.Namespace),
+		tag.Upsert(TagName, ar.Name))
+
 	if ar.Resource != resourcePod {
-		e := "not reviewing unexpected non-pod resource"
+		e := "cannot review non-pod resource"
 		log.Info(e, zap.String("expected", resourcePod.String()), zap.String("observed", ar.Resource.String()))
+		tags, _ = tag.New(tags, tag.Upsert(TagResult, tagResultError)) // nolint:gosec
+		stats.Record(tags, MeasurePodsReviewed.M(1))
 		return admissionError(errors.New(e), meta.StatusReasonInvalid)
 	}
 
@@ -172,23 +198,32 @@ func (i *PodInjector) Review(ar *admission.AdmissionRequest) *admission.Admissio
 	if _, _, err := serializer.Decode(ar.Object.Raw, nil, &pod); err != nil {
 		e := "cannot decode object as a pod"
 		log.Info(e, zap.Error(err))
+		tags, _ = tag.New(tags, tag.Upsert(TagResult, tagResultError)) // nolint:gosec
+		stats.Record(tags, MeasurePodsReviewed.M(1))
 		return admissionError(errors.Wrap(err, e), meta.StatusReasonInvalid)
 	}
 
-	for _, ignore := range i.ignore {
+	for _, ignore := range m.ignore {
 		if ignore(pod) {
 			log.Info("not mutating ignored pod")
+			tags, _ = tag.New(tags, tag.Upsert(TagResult, tagResultIgnored)) // nolint:gosec
+			stats.Record(tags, MeasurePodsReviewed.M(1))
 			return &admission.AdmissionResponse{Allowed: true}
 		}
 	}
 
-	patch, err := i.p.Patch(pod)
+	patch, err := m.p.Patch(pod)
 	if err != nil {
 		e := "cannot patch pod"
 		log.Info(e, zap.Error(err))
+		tags, _ = tag.New(tags, tag.Upsert(TagResult, tagResultError)) // nolint:gosec
+		stats.Record(tags, MeasurePodsReviewed.M(1))
 		return admissionError(errors.Wrap(err, e), meta.StatusReasonInternalError)
 	}
 
+	log.Debug("mutated pod")
+	tags, _ = tag.New(tags, tag.Upsert(TagResult, tagResultMutated)) // nolint:gosec
+	stats.Record(tags, MeasurePodsReviewed.M(1))
 	return &admission.AdmissionResponse{
 		UID:       ar.UID,
 		Allowed:   true,
