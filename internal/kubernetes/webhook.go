@@ -51,6 +51,6 @@ func AdmissionReviewWebhook(r Reviewer) http.HandlerFunc {
 			http.Error(w, "admission review must contain a request", http.StatusBadRequest)
 			return
 		}
-		serializer.Encode(&admission.AdmissionReview{Response: r.Review(ar.Request)}, w) // nolint:gosec
+		serializer.Encode(&admission.AdmissionReview{Response: r.Review(ar.Request)}, w) // nolint:gosec,errcheck
 	}
 }
