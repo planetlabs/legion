@@ -1,0 +1,7 @@
+{
+    "Vendor": true,
+    "Exclude": [
+        "not checked.+Close"
+    ],
+    "Deadline": "120s"
+}
