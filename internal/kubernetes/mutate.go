@@ -70,13 +70,19 @@ type Patcher interface {
 
 // PodMutation specifies how a pod will be mutated.
 type PodMutation struct {
-	meta.ObjectMeta `json:"metadata,omitempty"`
-	Spec            core.PodSpec     `json:"spec,omitempty"`
-	Strategy        MutationStrategy `json:"strategy,omitempty"`
+	meta.TypeMeta `json:",inline"`
+	Spec          PodMutationSpec     `json:"spec,omitempty"`
+	Strategy      PodMutationStrategy `json:"strategy,omitempty"`
 }
 
-// MutationStrategy determines how pod configuration will be injected.
-type MutationStrategy struct {
+//PodMutationSpec specifies the fields of a pod that will be updated.
+type PodMutationSpec struct {
+	meta.ObjectMeta `json:"metadata,omitempty"`
+	Spec            core.PodSpec `json:"spec,omitempty"`
+}
+
+// PodMutationStrategy determines how pod configuration will be injected.
+type PodMutationStrategy struct {
 	// Overwrite keys that are already set in the original pod.
 	Overwrite bool `json:"overwrite,omitempty"`
 
@@ -96,10 +102,10 @@ func (m PodMutation) Patch(original core.Pod) ([]byte, error) {
 	if m.Strategy.Append {
 		mo = append(mo, mergo.WithAppendSlice)
 	}
-	if err := mergo.Merge(&injected.ObjectMeta, m.ObjectMeta, mo...); err != nil {
+	if err := mergo.Merge(&injected.ObjectMeta, m.Spec.ObjectMeta, mo...); err != nil {
 		return nil, errors.Wrap(err, "cannot inject pod metadata")
 	}
-	if err := mergo.Merge(&injected.Spec, m.Spec, mo...); err != nil {
+	if err := mergo.Merge(&injected.Spec, m.Spec.Spec, mo...); err != nil {
 		return nil, errors.Wrap(err, "cannot inject pod spec")
 	}
 
