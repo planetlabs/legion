@@ -155,6 +155,14 @@ func IgnorePodsWithAnnotation(k, v string) IgnoreFunc {
 	}
 }
 
+// IgnorePodsWithoutAnnotation returns a function that ignores pods without the
+// supplied annotation.
+func IgnorePodsWithoutAnnotation(k, v string) IgnoreFunc {
+	return func(p core.Pod) bool {
+		return p.GetAnnotations()[k] != v
+	}
+}
+
 // A PodMutatorOption configures an PodMutator.
 type PodMutatorOption func(d *PodMutator)
 

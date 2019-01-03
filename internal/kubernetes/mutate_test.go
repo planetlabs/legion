@@ -159,30 +159,18 @@ func TestReview(t *testing.T) {
 			},
 		},
 		{
-			name:    "PodWithHostNetworkIsIgnored",
+			name:    "PodIsIgnored",
 			patcher: &predictablePatcher{patch: coolPatch},
-			options: []PodMutatorOption{WithIgnoreFuncs(IgnorePodsInHostNetwork())},
+			options: []PodMutatorOption{WithIgnoreFuncs(func() IgnoreFunc {
+				return func(_ core.Pod) bool {
+					return true
+				}
+			}())},
 			ar: &admission.AdmissionRequest{
 				Resource: resourcePod,
 				Object: runtime.RawExtension{Raw: func() []byte {
 					b := &bytes.Buffer{}
 					p := &core.Pod{Spec: core.PodSpec{HostNetwork: true}}
-					serializer.Encode(p, b)
-					return b.Bytes()
-				}()},
-			},
-			want: &admission.AdmissionResponse{Allowed: true},
-		},
-		{
-			name:    "PodWithAnnotationIsIgnored",
-			patcher: &predictablePatcher{patch: coolPatch},
-			options: []PodMutatorOption{WithIgnoreFuncs(IgnorePodsWithAnnotation("cool", "nope"))},
-			ar: &admission.AdmissionRequest{
-				Resource: resourcePod,
-				Object: runtime.RawExtension{Raw: func() []byte {
-					b := &bytes.Buffer{}
-					p := &core.Pod{}
-					p.SetAnnotations(map[string]string{"cool": "nope"})
 					serializer.Encode(p, b)
 					return b.Bytes()
 				}()},
@@ -232,6 +220,61 @@ func TestReview(t *testing.T) {
 			i := NewPodMutator(tc.patcher, tc.options...)
 			if diff := deep.Equal(i.Review(tc.ar), tc.want); diff != nil {
 				t.Errorf("got != want:\n%v\n", diff)
+			}
+		})
+	}
+}
+
+func TestIgnoreFunc(t *testing.T) {
+	cases := []struct {
+		name string
+		i    IgnoreFunc
+		p    core.Pod
+		want bool
+	}{
+		{
+			name: "PodWithHostNetworkIsIgnored",
+			i:    IgnorePodsInHostNetwork(),
+			p:    core.Pod{Spec: core.PodSpec{HostNetwork: true}},
+			want: true,
+		},
+		{
+			name: "PodWithoutHostNetworkIsNotIgnored",
+			i:    IgnorePodsInHostNetwork(),
+			p:    core.Pod{Spec: core.PodSpec{}},
+			want: false,
+		},
+		{
+			name: "PodWithAnnotationIsIgnored",
+			i:    IgnorePodsWithAnnotation("cool", "nope"),
+			p:    core.Pod{ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"cool": "nope"}}},
+			want: true,
+		},
+		{
+			name: "PodWithoutAnnotationIsNotIgnored",
+			i:    IgnorePodsWithAnnotation("cool", "nope"),
+			p:    core.Pod{ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"cool": "very"}}},
+			want: false,
+		},
+		{
+			name: "PodWithoutAnnotationIsIgnored",
+			i:    IgnorePodsWithoutAnnotation("cool", "very"),
+			p:    core.Pod{ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"cool": "nope"}}},
+			want: true,
+		},
+		{
+			name: "PodWithAnnotationIsNotIgnored",
+			i:    IgnorePodsWithoutAnnotation("cool", "very"),
+			p:    core.Pod{ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"cool": "very"}}},
+			want: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.i(tc.p)
+			if got != tc.want {
+				t.Errorf("got %v, want %v\n", got, tc.want)
 			}
 		})
 	}
