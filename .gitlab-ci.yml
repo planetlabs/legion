@@ -17,7 +17,7 @@ test:
     - gcp-terraflop
   before_script:
     - apk update && apk add git curl
-    - curl -sSL -o /bin/dep https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64 && chmod +x /dep
+    - curl -sSL -o /bin/dep https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64 && chmod +x /bin/dep
     - curl -sSL -o /gml.tgz https://github.com/alecthomas/gometalinter/releases/download/v2.0.12/gometalinter-2.0.12-linux-amd64.tar.gz && tar zxvf /gml.tgz -C /bin --strip-components=1
     - ln -s /code /go/src/code.earth.planet.com && cd /go/src/code.earth.planet.com/product/legion
     - dep ensure
