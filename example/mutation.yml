@@ -1,0 +1,21 @@
+---
+apiVersion: legion.planet.com/v1alpha1
+kind: PodMutation
+metadata:
+  name: example
+  labels:
+    mutation: example
+spec:
+  strategy:
+    overwrite: true
+    append: true
+  template:
+    metadata:
+      annotations:
+        example.planet.com/injected: 'true'
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+        - containerPort: 80
