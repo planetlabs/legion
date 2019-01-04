@@ -17,10 +17,12 @@ and limitations under the License.
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
@@ -41,8 +43,8 @@ func main() {
 		app = kingpin.New(filepath.Base(os.Args[0]), "Serves an admission webhook that mutates pods according to the provided config.").DefaultEnvars()
 
 		debug          = app.Flag("debug", "Run with debug logging.").Short('d').Bool()
-		certFile       = app.Flag("cert", "File containing a PEM encoded certificate to be presented by the webhook listen address.").ExistingFile()
-		keyFile        = app.Flag("key", "File containing a PEM encoded key to be presented by the webhook listen address.").ExistingFile()
+		certFile       = app.Flag("cert", "File containing a PEM encoded certificate to be presented by the webhook listen address.").Default("cert.pem").ExistingFile()
+		keyFile        = app.Flag("key", "File containing a PEM encoded key to be presented by the webhook listen address.").Default("key.pem").ExistingFile()
 		listenWebhook  = app.Flag("listen-webhook", "Address at which to expose /webhook via HTTPS.").Default(":10002").String()
 		listenInsecure = app.Flag("listen-insecure", "Address at which to expose /metrics and /healthz via HTTP.").Default(":10003").String()
 
@@ -77,12 +79,21 @@ func main() {
 	kingpin.FatalIfError(err, "cannot create log")
 	defer log.Sync() // nolint:errcheck,gosec
 
-	g := &errgroup.Group{}
+	g, ctx := errgroup.WithContext(context.Background())
 	g.Go(func() error {
 		rt := httprouter.New()
 		rt.Handler(http.MethodGet, "/metrics", metrics)
 		rt.HandlerFunc(http.MethodGet, "/healthz", func(_ http.ResponseWriter, _ *http.Request) {})
-		return errors.Wrap(http.ListenAndServe(*listenInsecure, rt), "cannot serve insecure requests")
+
+		log.Debug("listening for insecure requests", zap.String("listen", *listenInsecure))
+		s := http.Server{Addr: *listenInsecure, Handler: rt}
+		go func() {
+			<-ctx.Done()
+			sctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			s.Shutdown(sctx) // nolint:errcheck,gosec
+		}()
+		return errors.Wrap(s.ListenAndServe(), "cannot serve insecure requests")
 	})
 
 	g.Go(func() error {
@@ -109,7 +120,16 @@ func main() {
 		r := kubernetes.NewPodMutator(p, kubernetes.WithLogger(log), kubernetes.WithIgnoreFuncs(i...))
 		rt := httprouter.New()
 		rt.HandlerFunc(http.MethodPost, "/webhook", kubernetes.AdmissionReviewWebhook(r))
-		return errors.Wrap(http.ListenAndServeTLS(*listenWebhook, *certFile, *keyFile, rt), "cannot serve webhook requests")
+
+		log.Debug("listening for webhook requests", zap.String("listen", *listenWebhook))
+		s := http.Server{Addr: *listenWebhook, Handler: rt}
+		go func() {
+			<-ctx.Done()
+			sctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			s.Shutdown(sctx) // nolint:errcheck,gosec
+		}()
+		return errors.Wrap(s.ListenAndServeTLS(*certFile, *keyFile), "cannot serve webhook requests")
 	})
 
 	kingpin.FatalIfError(g.Wait(), "cannot serve HTTP requests")
