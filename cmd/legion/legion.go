@@ -17,7 +17,6 @@ and limitations under the License.
 package main
 
 import (
-	"flag"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -56,7 +55,6 @@ func main() {
 		config = app.Arg("config-file", "A PodMutation encoded as YAML or JSON.").ExistingFile()
 	)
 	kingpin.MustParse(app.Parse(os.Args[1:]))
-	glogWorkaround()
 
 	var (
 		podsReviewed = &view.View{
@@ -115,12 +113,4 @@ func main() {
 	})
 
 	kingpin.FatalIfError(g.Wait(), "cannot serve HTTP requests")
-}
-
-// Many Kubernetes client things depend on glog. glog gets sad when flag.Parse()
-// is not called before it tries to emit a log line. flag.Parse() fights with
-// kingpin.
-func glogWorkaround() {
-	os.Args = []string{os.Args[0], "-logtostderr=true", "-v=0", "-vmodule="}
-	flag.Parse()
 }
