@@ -28,6 +28,7 @@ import (
 func (in *PodMutation) DeepCopyInto(out *PodMutation) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	return
 }

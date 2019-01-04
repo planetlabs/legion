@@ -31,6 +31,8 @@ import (
 	admission "k8s.io/api/admission/v1beta1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -72,8 +74,9 @@ type Patcher interface {
 // +k8s:deepcopy-gen=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PodMutation struct {
-	meta.TypeMeta `json:",inline"`
-	Spec          PodMutationSpec `json:"spec,omitempty"`
+	meta.TypeMeta   `json:",inline"`
+	meta.ObjectMeta `json:"metadata,omitempty"`
+	Spec            PodMutationSpec `json:"spec,omitempty"`
 }
 
 // A PodMutationSpec specifies the fields of a pod that will be updated.
@@ -98,6 +101,23 @@ type PodMutationStrategy struct {
 
 	// Append to, rather than replacing, arrays in the original pod.
 	Append bool `json:"append,omitempty"`
+}
+
+// DecodePodMutation decodes a PodMutation from the provided bytes. It uses
+// k8s.io/apimachinery's UniversalDecoder in order to decode bytes encoded in
+// any format supported by Kubernetes (i.e. YAML, JSON, etc).
+func DecodePodMutation(data []byte) (PodMutation, error) {
+	scheme := runtime.NewScheme()
+	if err := AddToScheme(scheme); err != nil {
+		return PodMutation{}, errors.Wrap(err, "cannot register configuration scheme")
+	}
+	codecs := runtimeserializer.NewCodecFactory(scheme)
+
+	var pm PodMutation
+	if _, _, err := codecs.UniversalDecoder().Decode(data, nil, &pm); err != nil {
+		return PodMutation{}, errors.Wrap(err, "cannot decode PodMutation")
+	}
+	return pm, nil
 }
 
 // Patch generates an RFC 6902 JSON patch for the supplied pod.

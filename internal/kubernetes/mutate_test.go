@@ -28,9 +28,68 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	coolPodMutationYAML = `
+---
+apiVersion: legion.planet.com/v1alpha1
+kind: PodMutation
+metadata:
+  name: cool
+  labels:
+    mutation: cool
+spec:
+  strategy:
+    overwrite: true
+    append: true
+  template:
+    metadata:
+      annotations:
+        cool.planet.com/injected: 'true'
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+`
+
+	coolPodMutationJSON = `
+{
+  "apiVersion": "legion.planet.com/v1alpha1",
+  "kind": "PodMutation",
+  "metadata": {
+    "name": "cool",
+    "labels": {
+      "mutation": "cool"
+    }
+  },
+  "spec": {
+    "strategy": {
+      "overwrite": true,
+      "append": true
+    },
+    "template": {
+      "metadata": {
+        "annotations": {
+          "cool.planet.com/injected": "true"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "nginx",
+            "image": "nginx:1.7.9"
+          }
+        ]
+      }
+    }
+  }
+}
+`
+)
+
 var (
 	coolPatch = []byte("coolpatch")
-	coolPod   = core.Pod{
+
+	coolPod = core.Pod{
 		ObjectMeta: meta.ObjectMeta{
 			Name:        "coolpod",
 			Namespace:   "coolnamespace",
@@ -45,6 +104,18 @@ var (
 				Command: []string{"/cool"},
 				Args:    []string{"-very"},
 			}},
+		},
+	}
+
+	coolPodMutation = PodMutation{
+		TypeMeta:   meta.TypeMeta{APIVersion: SchemeGroupVersion.String(), Kind: "PodMutation"},
+		ObjectMeta: meta.ObjectMeta{Name: "cool", Labels: map[string]string{"mutation": "cool"}},
+		Spec: PodMutationSpec{
+			Strategy: PodMutationStrategy{Overwrite: true, Append: true},
+			Template: PodMutationTemplate{
+				ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"cool.planet.com/injected": "true"}},
+				Spec:       core.PodSpec{Containers: []core.Container{{Name: "nginx", Image: "nginx:1.7.9"}}},
+			},
 		},
 	}
 )
@@ -281,6 +352,29 @@ func TestIgnoreFunc(t *testing.T) {
 			got := tc.i(tc.p)
 			if got != tc.want {
 				t.Errorf("got %v, want %v\n", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDecodePodMutation(t *testing.T) {
+	cases := []struct {
+		name string
+		data []byte
+		want PodMutation
+	}{
+		{name: "YAML", data: []byte(coolPodMutationYAML), want: coolPodMutation},
+		{name: "JSON", data: []byte(coolPodMutationJSON), want: coolPodMutation},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := DecodePodMutation(tc.data)
+			if err != nil {
+				t.Fatalf("DecodePodMutation: %v", err)
+			}
+			if diff := deep.Equal(got, tc.want); diff != nil {
+				t.Errorf("got != want:\n%v\n", diff)
 			}
 		})
 	}
