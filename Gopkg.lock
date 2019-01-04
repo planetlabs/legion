@@ -2,14 +2,6 @@
 
 
 [[projects]]
-  digest = "1:666e546c77c8a4eb7a77fcbd5c9bc4a367e8ec2e4fb74dcd74d2e218751567ad"
-  name = "github.com/alecthomas/gometalinter"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "102ac984005d45456a7e3ae6dc94ebcd95c2bb19"
-  version = "v2.0.12"
-
-[[projects]]
   branch = "master"
   digest = "1:315c5f2f60c76d89b871c73f9bd5fe689cad96597afd50fb9992228ef80bdd34"
   name = "github.com/alecthomas/template"
@@ -80,14 +72,6 @@
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:473e7c5cbc58c538bce66e0ca2a033d31a3e7d9c6d5d96c6df1657b588bddac3"
-  name = "github.com/google/shlex"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "c34317bd91bf98fab745d77b03933cf8769299fe"
-
-[[projects]]
   digest = "1:8eb1de8112c9924d59bf1d3e5c26f5eaa2bfc2a5fcbb92dc1c2e4546d695f277"
   name = "github.com/imdario/mergo"
   packages = ["."]
@@ -134,27 +118,6 @@
   pruneopts = "UT"
   revision = "4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd"
   version = "1.0.1"
-
-[[projects]]
-  digest = "1:07140002dbf37da92090f731b46fa47be4820b82fe5c14a035203b0e813d0ec2"
-  name = "github.com/nicksnyder/go-i18n"
-  packages = [
-    "i18n",
-    "i18n/bundle",
-    "i18n/language",
-    "i18n/translation",
-  ]
-  pruneopts = "UT"
-  revision = "0dc1626d56435e9d605a29875701721c54bc9bbd"
-  version = "v1.10.0"
-
-[[projects]]
-  digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
-  name = "github.com/pelletier/go-toml"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "c01d1270ff3e442a8a57cddc1c92dc1138598194"
-  version = "v1.2.0"
 
 [[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
@@ -208,14 +171,6 @@
   ]
   pruneopts = "UT"
   revision = "14fa7590c24d4615893b68e22fce3b3489689f65"
-
-[[projects]]
-  digest = "1:c1b1102241e7f645bc8e0c22ae352e8f0dc6484b6cb4d132fa9f24174e0119e2"
-  name = "github.com/spf13/pflag"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "298182f68c66c05229eb03ac171abe6e309ee79a"
-  version = "v1.0.3"
 
 [[projects]]
   digest = "1:036099821592a40622e787d809038012b4d442335c6127cf09857c7a1225b720"
@@ -311,40 +266,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:4ec6135045fa6d5f7eddba2aad273581ac6f66e4e27ddc920affc104b4b9044e"
-  name = "golang.org/x/tools"
-  packages = [
-    "go/ast/astutil",
-    "go/gcexportdata",
-    "go/internal/cgo",
-    "go/internal/gcimporter",
-    "go/internal/packagesdriver",
-    "go/packages",
-    "go/types/typeutil",
-    "imports",
-    "internal/fastwalk",
-    "internal/gopathwalk",
-    "internal/semver",
-  ]
-  pruneopts = "UT"
-  revision = "ca9055ed7d0470e61b81778f76637846e891ff60"
-
-[[projects]]
   digest = "1:c06d9e11d955af78ac3bbb26bd02e01d2f61f689e1a3bce2ef6fb683ef8a7f2d"
   name = "gopkg.in/alecthomas/kingpin.v2"
   packages = ["."]
   pruneopts = "UT"
   revision = "947dcec5ba9c011838740e680966fd7087a71d0d"
   version = "v2.2.6"
-
-[[projects]]
-  branch = "v3-unstable"
-  digest = "1:9e71973a6f518a213cbbfa8c24feab33046b2835684818cb6b2c9ea73e823639"
-  name = "gopkg.in/alecthomas/kingpin.v3-unstable"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "df19058c872cddcd279411d709047160e543a700"
 
 [[projects]]
   digest = "1:2d1fbdc6777e5408cabeb02bf336305e724b925ff4546ded0fa8715a7267922a"
@@ -451,34 +378,6 @@
   version = "v10.0.0"
 
 [[projects]]
-  digest = "1:937e46834bfd618b223206d7e3d459bf0eb53ac7d05135bf809d73b8fafdf7f7"
-  name = "k8s.io/code-generator"
-  packages = [
-    "cmd/deepcopy-gen",
-    "cmd/deepcopy-gen/args",
-    "pkg/util",
-  ]
-  pruneopts = "UT"
-  revision = "c2090bec4d9b1fb25de3812f868accc2bc9ecbae"
-  version = "kubernetes-1.13.1"
-
-[[projects]]
-  branch = "master"
-  digest = "1:4db88b0d181fd2736b151f06eda6c776ef9ff2262d00d0eb5d6c947c03b00e91"
-  name = "k8s.io/gengo"
-  packages = [
-    "args",
-    "examples/deepcopy-gen/generators",
-    "examples/set-gen/sets",
-    "generator",
-    "namer",
-    "parser",
-    "types",
-  ]
-  pruneopts = "UT"
-  revision = "fd15ee9cc2f77baa4f31e59e6acbf21146455073"
-
-[[projects]]
   digest = "1:e2999bf1bb6eddc2a6aa03fe5e6629120a53088926520ca3b4765f77d7ff7eab"
   name = "k8s.io/klog"
   packages = ["."]
@@ -498,7 +397,6 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/alecthomas/gometalinter",
     "github.com/appscode/jsonpatch",
     "github.com/go-test/deep",
     "github.com/imdario/mergo",
@@ -519,7 +417,6 @@
     "k8s.io/apimachinery/pkg/runtime/serializer",
     "k8s.io/apimachinery/pkg/runtime/serializer/json",
     "k8s.io/client-go/kubernetes/scheme",
-    "k8s.io/code-generator/cmd/deepcopy-gen",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
