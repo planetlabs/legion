@@ -68,20 +68,24 @@ type Patcher interface {
 	Patch(core.Pod) ([]byte, error)
 }
 
-// PodMutation specifies how a pod will be mutated.
+// A PodMutation specifies how a pod will be mutated.
+// +k8s:deepcopy-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PodMutation struct {
 	meta.TypeMeta `json:",inline"`
 	Spec          PodMutationSpec     `json:"spec,omitempty"`
 	Strategy      PodMutationStrategy `json:"strategy,omitempty"`
 }
 
-//PodMutationSpec specifies the fields of a pod that will be updated.
+// A PodMutationSpec specifies the fields of a pod that will be updated.
+// +k8s:deepcopy-gen=true
 type PodMutationSpec struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            core.PodSpec `json:"spec,omitempty"`
 }
 
-// PodMutationStrategy determines how pod configuration will be injected.
+// A PodMutationStrategy determines how pod configuration will be injected.
+// +k8s:deepcopy-gen=true
 type PodMutationStrategy struct {
 	// Overwrite keys that are already set in the original pod.
 	Overwrite bool `json:"overwrite,omitempty"`

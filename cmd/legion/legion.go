@@ -18,19 +18,18 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
-
 	"go.opencensus.io/exporter/prometheus"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"code.earth.planet.com/product/legion/internal/kubernetes"
@@ -48,7 +47,13 @@ func main() {
 		listenWebhook  = app.Flag("listen-webhook", "Address at which to expose /webhook via HTTPS.").Default(":10002").String()
 		listenInsecure = app.Flag("listen-insecure", "Address at which to expose /metrics and /healthz via HTTP.").Default(":10003").String()
 
-		// config = app.Flag("config", "JSON or YAML pod mutation config.").ExistingFile()
+		// TODO(negz) Move these settings into kubernetes.PodMutation? Currently
+		// these settings configure _which_ pods are mutated, while PodMutation
+		ignorePodsWithHostNetwork    = app.Flag("ignore-pods-with-host-network", "Do not mutate pods running in the host network namespace.").Bool()
+		ignorePodsWithAnnotations    = app.Flag("ignore-pods-with-annotation", "Do not mutate pods with the specified annotations.").PlaceHolder("KEY=VALUE").StringMap()
+		ignorePodsWithoutAnnotations = app.Flag("ignore-pods-without-annotation", "Do not mutate pods without the specified annotations").PlaceHolder("KEY=VALUE").StringMap()
+
+		config = app.Arg("config-file", "A PodMutation encoded as YAML or JSON.").ExistingFile()
 	)
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 	glogWorkaround()
@@ -83,15 +88,30 @@ func main() {
 	})
 
 	g.Go(func() error {
-		// TODO(negz): Load this from *config. Consider making it a 'real'
-		// Kubernetes compatible object so we can use the universal decoder.
-		p := kubernetes.PodMutation{}
-		// TODO(negz): Figure out how to handle/configure ignore funcs?
-		r := kubernetes.NewPodMutator(p, kubernetes.WithLogger(log))
+		data, err := ioutil.ReadFile(*config)
+		if err != nil {
+			return errors.Wrap(err, "cannot read configuration file")
+		}
+		p, err := kubernetes.DecodePodMutation(data)
+		if err != nil {
+			return errors.Wrap(err, "cannot decode configuration file")
+		}
+
+		i := []kubernetes.IgnoreFunc{}
+		if *ignorePodsWithHostNetwork {
+			i = append(i, kubernetes.IgnorePodsInHostNetwork())
+		}
+		for k, v := range *ignorePodsWithAnnotations {
+			i = append(i, kubernetes.IgnorePodsWithAnnotation(k, v))
+		}
+		for k, v := range *ignorePodsWithoutAnnotations {
+			i = append(i, kubernetes.IgnorePodsWithoutAnnotation(k, v))
+		}
+
+		r := kubernetes.NewPodMutator(p, kubernetes.WithLogger(log), kubernetes.WithIgnoreFuncs(i...))
 		rt := httprouter.New()
-		// TODO(negz): Confirm webhooks are POST-ed
 		rt.HandlerFunc(http.MethodPost, "/webhook", kubernetes.AdmissionReviewWebhook(r))
-		return errors.Wrap(http.ListenAndServeTLS(*listenWebhook, *certFile, *keyFile, rt), "cannot serve insecure requests")
+		return errors.Wrap(http.ListenAndServeTLS(*listenWebhook, *certFile, *keyFile, rt), "cannot serve webhook requests")
 	})
 
 	kingpin.FatalIfError(g.Wait(), "cannot serve HTTP requests")
