@@ -67,7 +67,9 @@ func TestPatch(t *testing.T) {
 			pod:  coolPod,
 			spec: PodMutation{
 				Spec: PodMutationSpec{
-					ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"supercool": "alsotrue"}},
+					Template: PodMutationTemplate{
+						ObjectMeta: meta.ObjectMeta{Annotations: map[string]string{"supercool": "alsotrue"}},
+					},
 				},
 			},
 			want: []byte("[{\"op\":\"add\",\"path\":\"/metadata/annotations/supercool\",\"value\":\"alsotrue\"}]"),
@@ -77,14 +79,16 @@ func TestPatch(t *testing.T) {
 			pod:  coolPod,
 			spec: PodMutation{
 				Spec: PodMutationSpec{
-					Spec: core.PodSpec{
-						Containers: []core.Container{{
-							Name:  "coolercontainer",
-							Image: "extracool:somehowmorecool",
-						}},
+					Strategy: PodMutationStrategy{Append: true},
+					Template: PodMutationTemplate{
+						Spec: core.PodSpec{
+							Containers: []core.Container{{
+								Name:  "coolercontainer",
+								Image: "extracool:somehowmorecool",
+							}},
+						},
 					},
 				},
-				Strategy: PodMutationStrategy{Append: true},
 			},
 			want: []byte("[{\"op\":\"add\",\"path\":\"/spec/containers/1\",\"value\":{\"image\":\"extracool:somehowmorecool\",\"name\":\"coolercontainer\",\"resources\":{}}}]"),
 		},
@@ -93,12 +97,14 @@ func TestPatch(t *testing.T) {
 			pod:  coolPod,
 			spec: PodMutation{
 				Spec: PodMutationSpec{
-					Spec: core.PodSpec{
-						DNSPolicy: core.DNSNone,
-						DNSConfig: &core.PodDNSConfig{Nameservers: []string{"127.0.0.1"}},
+					Strategy: PodMutationStrategy{Overwrite: true},
+					Template: PodMutationTemplate{
+						Spec: core.PodSpec{
+							DNSPolicy: core.DNSNone,
+							DNSConfig: &core.PodDNSConfig{Nameservers: []string{"127.0.0.1"}},
+						},
 					},
 				},
-				Strategy: PodMutationStrategy{Overwrite: true},
 			},
 			want: []byte("[{\"op\":\"add\",\"path\":\"/spec/dnsConfig\",\"value\":{\"nameservers\":[\"127.0.0.1\"]}},{\"op\":\"replace\",\"path\":\"/spec/dnsPolicy\",\"value\":\"None\"}]"),
 		},

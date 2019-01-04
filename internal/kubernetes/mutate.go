@@ -73,13 +73,19 @@ type Patcher interface {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PodMutation struct {
 	meta.TypeMeta `json:",inline"`
-	Spec          PodMutationSpec     `json:"spec,omitempty"`
-	Strategy      PodMutationStrategy `json:"strategy,omitempty"`
+	Spec          PodMutationSpec `json:"spec,omitempty"`
 }
 
 // A PodMutationSpec specifies the fields of a pod that will be updated.
 // +k8s:deepcopy-gen=true
 type PodMutationSpec struct {
+	Strategy PodMutationStrategy `json:"strategy,omitempty"`
+	Template PodMutationTemplate `json:"template,omitempty"`
+}
+
+// A PodMutationTemplate specifies the fields of a pod that will be updated.
+// +k8s:deepcopy-gen=true
+type PodMutationTemplate struct {
 	meta.ObjectMeta `json:"metadata,omitempty"`
 	Spec            core.PodSpec `json:"spec,omitempty"`
 }
@@ -100,16 +106,16 @@ func (m PodMutation) Patch(original core.Pod) ([]byte, error) {
 	original.DeepCopyInto(&injected)
 
 	mo := []func(*mergo.Config){}
-	if m.Strategy.Overwrite {
+	if m.Spec.Strategy.Overwrite {
 		mo = append(mo, mergo.WithOverride)
 	}
-	if m.Strategy.Append {
+	if m.Spec.Strategy.Append {
 		mo = append(mo, mergo.WithAppendSlice)
 	}
-	if err := mergo.Merge(&injected.ObjectMeta, m.Spec.ObjectMeta, mo...); err != nil {
+	if err := mergo.Merge(&injected.ObjectMeta, m.Spec.Template.ObjectMeta, mo...); err != nil {
 		return nil, errors.Wrap(err, "cannot inject pod metadata")
 	}
-	if err := mergo.Merge(&injected.Spec, m.Spec.Spec, mo...); err != nil {
+	if err := mergo.Merge(&injected.Spec, m.Spec.Template.Spec, mo...); err != nil {
 		return nil, errors.Wrap(err, "cannot inject pod spec")
 	}
 
