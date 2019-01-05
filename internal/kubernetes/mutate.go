@@ -266,7 +266,7 @@ func (m *PodMutator) Review(ar *admission.AdmissionRequest) *admission.Admission
 		return admissionError(errors.Wrap(err, e), meta.StatusReasonInternalError)
 	}
 
-	log.Debug("mutated pod")
+	log.Debug("mutated pod", zap.ByteString("original", ar.Object.Raw), zap.ByteString("patch", patch))
 	tags, _ = tag.New(tags, tag.Upsert(TagResult, tagResultMutated)) // nolint:gosec
 	stats.Record(tags, MeasurePodsReviewed.M(1))
 	return &admission.AdmissionResponse{
