@@ -250,7 +250,7 @@ func (m *PodMutator) Review(ar *admission.AdmissionRequest) *admission.Admission
 
 	for _, ignore := range m.ignore {
 		if ignore(pod) {
-			log.Info("not mutating ignored pod")
+			log.Debug("not mutating ignored pod")
 			tags, _ = tag.New(tags, tag.Upsert(TagResult, tagResultIgnored)) // nolint:gosec
 			stats.Record(tags, MeasurePodsReviewed.M(1))
 			return &admission.AdmissionResponse{Allowed: true}
