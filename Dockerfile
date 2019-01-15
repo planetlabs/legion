@@ -2,7 +2,7 @@ FROM golang:1.11-alpine3.8 AS build
 
 RUN apk update && apk add git curl
 
-WORKDIR /go/src/code.earth.planet.com/product/legion
+WORKDIR /go/src/github.com/planetlabs/legion
 COPY . .
 
 RUN curl -sSL -o /dep https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64 && chmod +x /dep
