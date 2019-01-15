@@ -33,7 +33,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/alecthomas/kingpin.v2"
 
-	"code.earth.planet.com/product/legion/internal/kubernetes"
+	"github.com/planetlabs/legion/internal/kubernetes"
 )
 
 const component = "legion"
