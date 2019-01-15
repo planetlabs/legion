@@ -1,0 +1,32 @@
+language: go
+
+services:
+  - docker
+
+go:
+  - 1.11.x
+
+jobs:
+  include:
+    - stage: test
+      before_install:
+        - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+        - go get -u github.com/alecthomas/gometalinter
+      install:
+        - dep ensure
+        - gometalinter --install
+      script:
+        - gometalinter
+        - go test -v -cover ./...
+    - stage: push
+      install: skip
+      script:
+        - export VERSION=$(git rev-parse --short HEAD)
+        - docker build --tag planetlabs/legion:${VERSION:0:8} .
+        - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+        - docker push planetlabs/legion:${VERSION:0:8}
+
+stages:
+  - name: test
+  - name: push
+    if: branch = master and not type = pull_request
