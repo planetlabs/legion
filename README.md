@@ -51,7 +51,7 @@ a simple health ping at `/healthz` and Prometheus metrics at `/metrics` on port
 10003 by default. The webhook is served via HTTPS at port 10002 by default.
 
 ```bash
-$ docker run us.gcr.io/planet-gcr/legion:0c530f14 /legion --help
+$ docker run planetlabs/legion:0c530f14 /legion --help
 usage: legion [<flags>] [<config-file>]
 
 Serves an admission webhook that mutates pods according to the provided config.
