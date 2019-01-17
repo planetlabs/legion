@@ -1,4 +1,4 @@
-# Legion
+# legion [![Docker Pulls](https://img.shields.io/docker/pulls/planetlabs/legion.svg)](https://hub.docker.com/r/planetlabs/legion/) [![Godoc](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/planetlabs/legion) [![Travis](https://img.shields.io/travis/com/planetlabs/legion.svg?maxAge=300)](https://travis-ci.com/planetlabs/legion/) [![Codecov](https://img.shields.io/codecov/c/github/planetlabs/legion.svg?maxAge=3600)](https://codecov.io/gh/planetlabs/legion/)
 Legion serves a Kubernetes mutating admission webhook that mutates pods. Pods
 are mutated according to a `PodMutation`, which configures how pod fields are
 set, altered, or appended during mutation.
